@@ -7,6 +7,7 @@ import DevForm from "./components/DevForm";
 import './Global.css';
 import './App.css';
 import './Main.css';
+import './Sidebar.css'
 
 function App() {
 
