@@ -1,24 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Image, View, Text, TextInput, TouchableOpacity } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
-import { requestPermissionsAsync, getCurrentPositionAsync } from 'expo-location'
-import { MaterialIcons } from '@expo/vector-icons'
+import { requestPermissionsAsync, getCurrentPositionAsync } from 'expo-location';
+import { MaterialIcons } from '@expo/vector-icons';
 
-import api from '../services/api'
+import api from '../services/api';
+import { connect, disconnect, subscribeToNewDevs } from '../services/socket';
 
 function Main({ navigation }) {
   const [devs, setDevs] = useState([]);
   const [currentRegion, setCurrentRegion] = useState(null);
-  // const [techs, setTechs] = useState
+  const [techs, setTechs] = useState('');
+
   useEffect(() => {
     async function loadInitialPosition() {
       const { granted } = await requestPermissionsAsync();
+
       if (granted) {
         const { coords } = await getCurrentPositionAsync({
           enableHighAccuracy: true,
         });
 
         const { latitude, longitude } = coords;
+
         setCurrentRegion({
           latitude,
           longitude,
@@ -27,26 +31,43 @@ function Main({ navigation }) {
         })
       }
     }
+
     loadInitialPosition();
   }, []);
+
+  useEffect(() => {
+    subscribeToNewDevs(dev => setDevs([...devs, dev]));
+  }, [devs]);
+
+  function setupWebsocket() {
+    disconnect();
+
+    const { latitude, longitude } = currentRegion;
+
+    connect(
+      latitude,
+      longitude,
+      techs,
+    );
+  }
 
   async function loadDevs() {
     const { latitude, longitude } = currentRegion;
 
-    const response = await api.get('/search ', {
+    const response = await api.get('/search', {
       params: {
         latitude,
         longitude,
-        techs: 'JavaScript'
+        techs
       }
     });
-    console.log(response.data.devs)
+    
     setDevs(response.data.devs);
+    setupWebsocket();
   }
 
-  function handleRegionChange(region) {
-    console.log(region)
-    setCurrentRegion(region)
+  function handleRegionChanged(region) {
+    setCurrentRegion(region);
   }
 
   if (!currentRegion) {
@@ -55,27 +76,26 @@ function Main({ navigation }) {
 
   return (
     <>
-      <MapView
-        onRegionChangeComplete={handleRegionChange}
-        initialRegion={currentRegion}
+      <MapView 
+        onRegionChangeComplete={handleRegionChanged} 
+        initialRegion={currentRegion} 
         style={styles.map}
       >
         {devs.map(dev => (
-          <Marker
+          <Marker 
             key={dev._id}
-            coordinate={{
+            coordinate={{ 
               longitude: dev.location.coordinates[0],
-              latitude: dev.location.coordinates[1],
+              latitude: dev.location.coordinates[1], 
             }}
           >
-            <Image
-              style={styles.avatar}
+            <Image 
+              style={styles.avatar} 
               source={{ uri: dev.avatar_url }}
             />
 
             <Callout onPress={() => {
-              //Navegaçao
-              navigation.navigate('Profile', { github_username: dev.github_username })
+              navigation.navigate('Profile', { github_username: dev.github_username });
             }}>
               <View style={styles.callout}>
                 <Text style={styles.devName}>{dev.name}</Text>
@@ -85,15 +105,16 @@ function Main({ navigation }) {
             </Callout>
           </Marker>
         ))}
-
       </MapView>
       <View style={styles.searchForm}>
-        <TextInput
+        <TextInput 
           style={styles.searchInput}
-          placeholder="Buscar Devs Por Techs..."
+          placeholder="Buscar devs por techs..."
           placeholderTextColor="#999"
           autoCapitalize="words"
           autoCorrect={false}
+          value={techs}
+          onChangeText={setTechs}
         />
 
         <TouchableOpacity onPress={loadDevs} style={styles.loadButton}>
@@ -101,52 +122,58 @@ function Main({ navigation }) {
         </TouchableOpacity>
       </View>
     </>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
   map: {
     flex: 1
   },
+
   avatar: {
     width: 54,
     height: 54,
     borderRadius: 4,
     borderWidth: 4,
-    borderColor: '#FFF',
+    borderColor: '#FFF'
   },
 
   callout: {
     width: 260,
   },
+
   devName: {
     fontWeight: 'bold',
     fontSize: 16,
   },
+
   devBio: {
     color: '#666',
     marginTop: 5,
   },
+
   devTechs: {
     marginTop: 5,
   },
+
   searchForm: {
-    position: "absolute",
+    position: 'absolute',
     top: 20,
     left: 20,
     right: 20,
     zIndex: 5,
-    flexDirection: "row",
+    flexDirection: 'row',
   },
+
   searchInput: {
     flex: 1,
     height: 50,
-    backgroundColor: '#fff',
-    color: "#333",
+    backgroundColor: '#FFF',
+    color: '#333',
     borderRadius: 25,
     paddingHorizontal: 20,
     fontSize: 16,
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowOffset: {
       width: 4,
@@ -154,15 +181,16 @@ const styles = StyleSheet.create({
     },
     elevation: 2,
   },
+
   loadButton: {
     width: 50,
     height: 50,
-    backgroundColor: "#8e4dff",
+    backgroundColor: '#8E4Dff',
     borderRadius: 25,
     justifyContent: 'center',
-    alignItems: "center",
+    alignItems: 'center',
     marginLeft: 15,
-  }
+  },
 })
 
 export default Main;
